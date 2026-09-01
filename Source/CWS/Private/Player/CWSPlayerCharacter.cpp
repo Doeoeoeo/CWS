@@ -12,10 +12,12 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "Combat/CWSProjectile.h"
+#include "Player/CWSPlayerController.h"
 
 ACWSPlayerCharacter::ACWSPlayerCharacter()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	// Prevent the character from rotating the camera
 	bUseControllerRotationPitch = false;
@@ -34,7 +36,7 @@ ACWSPlayerCharacter::ACWSPlayerCharacter()
 	Movement->MaxFlySpeed = 600.0f;
 	Movement->BrakingDecelerationFlying = 2000.0f;
 	
-	GetSprite()->SetRelativeRotation(FRotator(0, 0, -90.0f));
+	GetSprite()->SetRelativeRotation(FRotator(0, 90, -90.0f));
 	GetSprite()->SetRelativeLocation(FVector(0, 0, 1.0));
 	GetSprite()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -51,6 +53,7 @@ ACWSPlayerCharacter::ACWSPlayerCharacter()
 	TopDownCamera->ProjectionMode = ECameraProjectionMode::Orthographic;
 
 	TopDownCamera->OrthoWidth = 1920.0f;
+
 }
 
 void ACWSPlayerCharacter::BeginPlay()
@@ -85,15 +88,55 @@ void ACWSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	}
 
 
-	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent); EnhancedInput && MoveAction)
+	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent); EnhancedInput)
 	{
-		EnhancedInput->BindAction(
-			MoveAction,
-			ETriggerEvent::Triggered,
-			this,
-			&ACWSPlayerCharacter::Move
-		);
+		if (MoveAction)
+		{
+			EnhancedInput->BindAction(
+				MoveAction,
+				ETriggerEvent::Triggered,
+				this,
+				&ACWSPlayerCharacter::Move
+			);
+		}
+
+		if (FireAction)
+		{
+			EnhancedInput->BindAction(
+				FireAction,
+				ETriggerEvent::Triggered,
+				this,
+				&ACWSPlayerCharacter::Fire
+			);
+		}
 	}
+}
+
+void ACWSPlayerCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	const ACWSPlayerController* PlayerController = Cast<ACWSPlayerController>(GetController());
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	FVector AimDirection;
+
+	if (!PlayerController->GetMouseAimDirection(
+		GetActorLocation(),
+		AimDirection
+	))
+	{
+		return;
+	}
+	// Save value for aiming purposes
+	CurrentAimDirection = AimDirection;
+	
+	const float AimYaw = AimDirection.Rotation().Yaw + AimRotationOffsetDegrees;
+
+	SetActorRotation(FRotator(0.0f, AimYaw, 0.0f));
 }
 
 void ACWSPlayerCharacter::Move(const FInputActionValue& Value)
@@ -102,4 +145,47 @@ void ACWSPlayerCharacter::Move(const FInputActionValue& Value)
 
 	AddMovementInput(FVector::ForwardVector, Direction.X);
 	AddMovementInput(FVector::RightVector, Direction.Y);
+}
+
+void ACWSPlayerCharacter::Fire()
+{
+	if (!ProjectileClass)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		return;
+	}
+
+	// Check if we can fire
+	const double CurrentTime = World->GetTimeSeconds();
+	if (CurrentTime < NextAllowedFireTime)
+	{
+		return;
+	}
+	NextAllowedFireTime = CurrentTime + FireInterval;
+	
+	const FVector SpawnLocation = GetActorLocation() + CurrentAimDirection * ProjectileSpawnDistance;
+	const FRotator SpawnRotation = CurrentAimDirection.Rotation();
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	ACWSProjectile* Projectile = World->SpawnActor<ACWSProjectile>(
+		ProjectileClass,
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParameters
+	);
+
+	if (Projectile)
+	{
+		Projectile->Launch(CurrentAimDirection);
+	}
 }
