@@ -12,6 +12,7 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "Combat/CWSHealthComponent.h"
 #include "Combat/CWSProjectile.h"
 #include "Player/CWSPlayerController.h"
 
@@ -54,6 +55,11 @@ ACWSPlayerCharacter::ACWSPlayerCharacter()
 
 	TopDownCamera->OrthoWidth = 1920.0f;
 
+	// Health
+	HealthComponent = CreateDefaultSubobject<UCWSHealthComponent>(
+		TEXT("Health")
+	);
+
 }
 
 void ACWSPlayerCharacter::BeginPlay()
@@ -67,6 +73,19 @@ void ACWSPlayerCharacter::BeginPlay()
 
 	// Flying ignores gravity and floor requirements (The plane constraint keeps it on the plane)
 	Movement->SetMovementMode(MOVE_Flying);
+
+	// Health
+	HealthComponent->OnHealthChanged.AddDynamic(
+		this,
+		&ACWSPlayerCharacter::HandleHealthChanged
+	);
+
+	HealthComponent->OnDeath.AddDynamic(
+		this,
+		&ACWSPlayerCharacter::HandleDeath
+	);
+
+	
 }
 
 void ACWSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -116,6 +135,12 @@ void ACWSPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// TMP
+	if (HealthComponent->IsDead())
+	{
+		return;
+	}
+	
 	const ACWSPlayerController* PlayerController = Cast<ACWSPlayerController>(GetController());
 	if (!PlayerController)
 	{
@@ -187,5 +212,30 @@ void ACWSPlayerCharacter::Fire()
 	if (Projectile)
 	{
 		Projectile->Launch(CurrentAimDirection);
+	}
+
+	
+}
+
+void ACWSPlayerCharacter::HandleHealthChanged(float CurrentHealth, float MaxHealth)
+{
+	UE_LOG(
+	LogTemp,
+	Log,
+	TEXT("Player health: %.1f / %.1f"),
+	CurrentHealth,
+	MaxHealth
+);
+}
+
+void ACWSPlayerCharacter::HandleDeath(AActor* DeadActor)
+{
+	if (DeadActor == this)
+	{
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()); PlayerController && PlayerMappingContext)
+		{
+			PlayerController->StopMovement();
+			DisableInput(PlayerController);
+		}
 	}
 }

@@ -13,6 +13,7 @@ class UInputMappingContext;
 struct FInputActionValue;
 
 class ACWSProjectile;
+class UCWSHealthComponent;
 
 UCLASS()
 class CWS_API ACWSPlayerCharacter : public APaperCharacter
@@ -103,4 +104,23 @@ private:
 	double NextAllowedFireTime = 0.0f;
 
 	FVector CurrentAimDirection = FVector::ForwardVector;
+
+	// Health
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Character",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UCWSHealthComponent> HealthComponent;
+
+	UFUNCTION()
+	void HandleHealthChanged(
+		float CurrentHealth,
+		float MaxHealth
+	);
+
+	UFUNCTION()
+	void HandleDeath(AActor* DeadActor);
+	
 };
