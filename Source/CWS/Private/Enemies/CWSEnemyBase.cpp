@@ -3,15 +3,16 @@
 
 #include "Enemies/CWSEnemyBase.h"
 
+#include "AIController.h"
 #include "PaperFlipbookComponent.h"
 #include "Components/SphereComponent.h"
 #include "Combat/CWSHealthComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-// Sets default values
+
 ACWSEnemyBase::ACWSEnemyBase()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	EnemyCollision = CreateDefaultSubobject<USphereComponent>(
 		TEXT("Collision")
@@ -45,7 +46,33 @@ ACWSEnemyBase::ACWSEnemyBase()
 		TEXT("Health")
 	);
 
+	// Gives spawned enemies an AI controller to move them
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+	AIControllerClass = AAIController::StaticClass();
+}
+
+void ACWSEnemyBase::SetEnemyActive(bool bNewActive)
+{
+	if (bNewActive == bIsEnemyActive)
+	{
+		return;
+	}
+
+	bIsEnemyActive = bNewActive;
+
+	// Disable enemy
+	SetActorTickEnabled(bIsEnemyActive);
+	SetActorEnableCollision(bIsEnemyActive);
+
+	// Stop the remaining movement
+	ConsumeMovementInputVector();
+	if (UPawnMovementComponent* Movement = GetMovementComponent())
+	{
+		Movement->StopMovementImmediately();
+	}
+
+	OnEnemyActiveChanged(bIsEnemyActive);
+	
 }
 
 void ACWSEnemyBase::BeginPlay()
@@ -72,6 +99,12 @@ void ACWSEnemyBase::Die()
 
 void ACWSEnemyBase::OnPlayerOverlap(APawn* PlayerPawn)
 {
+	// Ignore collisions if enemies are stopped
+	if (!bIsEnemyActive)
+	{
+		return;
+	}
+	
 	UGameplayStatics::ApplyDamage(
 		PlayerPawn,
 		ContactDamage,
@@ -80,6 +113,10 @@ void ACWSEnemyBase::OnPlayerOverlap(APawn* PlayerPawn)
 		UDamageType::StaticClass()
 	);
 	
+}
+
+void ACWSEnemyBase::OnEnemyActiveChanged(bool bNewActive)
+{
 }
 
 void ACWSEnemyBase::HandleDeath(AActor* DeadActor)

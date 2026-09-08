@@ -18,6 +18,21 @@ class CWS_API ACWSEnemyBase : public APawn
 public:	
 	ACWSEnemyBase();
 
+	UFUNCTION(
+		BlueprintCallable,
+		Category = "Enemy"
+	)
+	void SetEnemyActive(bool bNewActive);
+
+	UFUNCTION(
+		BlueprintPure,
+		Category = "Enemy"
+	)
+	bool IsEnemyActive() const
+	{
+		return bIsEnemyActive;
+	}
+	
 protected:
 	virtual void BeginPlay() override;
 
@@ -39,6 +54,8 @@ protected:
 	{
 		ContactDamage = FMath::Max(Damage, 0.0f);	
 	}
+
+	virtual void OnEnemyActiveChanged(bool bNewActive);
 	
 private:
 	UFUNCTION()
@@ -88,4 +105,12 @@ private:
 		)
 	)
 	float ContactDamage = 0.0f;
+
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		meta = (AllowPrivateAccess = "true")
+	)
+	bool bIsEnemyActive = true;
 };

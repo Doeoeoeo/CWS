@@ -7,19 +7,14 @@
 #include "TimerManager.h"
 #include "Enemies/CWSEnemyBase.h"
 
-// Sets default values
 ACWSEnemySpawner::ACWSEnemySpawner()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
 }
 
-// Called when the game starts or when spawned
-void ACWSEnemySpawner::BeginPlay()
+void ACWSEnemySpawner::StartSpawning()
 {
-	Super::BeginPlay();
-
 	TargetPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 
 	if (bSpawnImmediately)
@@ -34,6 +29,30 @@ void ACWSEnemySpawner::BeginPlay()
 		SpawnInterval,
 		true
 	);
+}
+
+void ACWSEnemySpawner::StopSpawning()
+{
+	GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+}
+
+void ACWSEnemySpawner::SetActiveEnemiesEnabled(bool bEnabled)
+{
+	for (const TWeakObjectPtr<ACWSEnemyBase>& EnemyPtr: ActiveEnemies)
+	{
+		if (ACWSEnemyBase* Enemy = EnemyPtr.Get())
+		{
+			Enemy->SetEnemyActive(bEnabled);
+		}
+	}
+}
+
+// Called when the game starts or when spawned
+void ACWSEnemySpawner::BeginPlay()
+{
+	Super::BeginPlay();
+
+	StartSpawning();
 	
 }
 

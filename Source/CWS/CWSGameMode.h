@@ -6,11 +6,10 @@
 #include "GameFramework/GameModeBase.h"
 #include "CWSGameMode.generated.h"
 
-/**
- * Base game mode for CWS.
- *
- * The player pawn will be assigned when the top-down character is implemented.
- */
+
+
+class ACWSEnemySpawner;
+
 UCLASS()
 class CWS_API ACWSGameMode : public AGameModeBase
 {
@@ -18,4 +17,20 @@ class CWS_API ACWSGameMode : public AGameModeBase
 
 public:
 	ACWSGameMode();
+
+protected:
+	virtual void BeginPlay() override;
+
+	virtual void RestartPlayer(AController* NewPlayer) override;
+
+private:
+	UFUNCTION()
+	void HandlePlayerDeath(AActor* DeadActor);
+
+	TArray<TWeakObjectPtr<ACWSEnemySpawner>> EnemySpawners;
+
+	bool bRoundOver = false;
+	
 };
+
+

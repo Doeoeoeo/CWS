@@ -17,6 +17,10 @@ class CWS_API ACWSEnemySpawner : public AActor
 public:	
 	ACWSEnemySpawner();
 
+	void StartSpawning();
+	void StopSpawning();
+	void SetActiveEnemiesEnabled(bool bEnabled);
+	
 protected:
 	virtual void BeginPlay() override;
 
