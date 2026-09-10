@@ -3,6 +3,9 @@
 
 #include "Player/CWSPlayerController.h"
 
+#include "Blueprint/UserWidget.h"
+#include "Kismet/GameplayStatics.h"
+
 ACWSPlayerController::ACWSPlayerController()
 {
 	bShowMouseCursor = true;
@@ -21,6 +24,43 @@ void ACWSPlayerController::BeginPlay()
 	SetInputMode(InputMode);
 }
 
+void ACWSPlayerController::ShowGameOverScreen()
+{
+	if (!IsLocalController() || !GameOverWidgetClass || GameOverWidget)
+	{
+		return;
+	}
+
+	GameOverWidget = CreateWidget<UUserWidget>(
+		this,
+		GameOverWidgetClass
+	);
+
+	if (!IsValid(GameOverWidget))
+	{
+		return;
+	}
+
+	GameOverWidget->AddToViewport(100);
+
+	FInputModeUIOnly InputMode;
+	SetInputMode(InputMode);
+
+	bShowMouseCursor = true;
+}
+
+void ACWSPlayerController::RestartCurrentLevel()
+{
+	const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(
+		this,
+		true
+	);
+
+	UGameplayStatics::OpenLevel(
+		this,
+		FName(*CurrentLevelName)
+	);
+}
 
 bool ACWSPlayerController::GetMouseAimDirection(
 	const FVector& PlaneOrigin, FVector& OutDirection
@@ -51,5 +91,7 @@ bool ACWSPlayerController::GetMouseAimDirection(
 	OutDirection = (AimPosition - PlaneOrigin).GetSafeNormal2D();
 
 	return !OutDirection.IsNearlyZero();
+
+	
 }
 

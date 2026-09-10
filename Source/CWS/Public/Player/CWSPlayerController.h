@@ -7,13 +7,15 @@
 #include "CWSPlayerController.generated.h"
 
 
+class UUserWidget;
+
 UCLASS()
 class CWS_API ACWSPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
 
-	public:
+public:
 	ACWSPlayerController();
 
 	bool GetMouseAimDirection(
@@ -21,6 +23,30 @@ class CWS_API ACWSPlayerController : public APlayerController
 		FVector& OutDirection	
 	) const;
 
-	protected:
-		virtual void BeginPlay() override;
+	UFUNCTION(
+		BlueprintCallable,
+		Category = "Game"
+	)
+	void ShowGameOverScreen();
+	
+	UFUNCTION(
+			BlueprintCallable,
+			Category = "Game"
+		)
+	void RestartCurrentLevel();
+	
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "UI",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TSubclassOf<UUserWidget> GameOverWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> GameOverWidget;
 };

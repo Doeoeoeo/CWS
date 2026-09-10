@@ -58,6 +58,7 @@ void ACWSGameMode::HandlePlayerDeath(AActor* DeadActor)
 
 	bRoundOver = true;
 
+	// Stop enemy spawning and movement
 	for (const TWeakObjectPtr<ACWSEnemySpawner>& Spawner: EnemySpawners)
 	{
 		if (Spawner.IsValid())
@@ -68,4 +69,13 @@ void ACWSGameMode::HandlePlayerDeath(AActor* DeadActor)
 
 		UE_LOG(LogTemp, Log, TEXT("Game Over"));
 	}
+
+	// Display Game Over screen
+	if (ACWSPlayerController* PlayerController = Cast<ACWSPlayerController>(
+		UGameplayStatics::GetPlayerController(this, 0))
+	)
+	{
+		PlayerController->ShowGameOverScreen();
+	}
+	
 }
