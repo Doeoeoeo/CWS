@@ -78,5 +78,5 @@ private:
 		Category = "Health",
 		meta = (AllowPrivateAccess = "true")
 	)
-	float CurrentHealth = 0.0f;
+	float CurrentHealth = 3.0f;
 };

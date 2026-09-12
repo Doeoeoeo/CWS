@@ -8,6 +8,9 @@
 
 
 class UUserWidget;
+class UCWSPlayerHUDWidget;
+class UCWSHUDWidget;
+class UCWSHealthComponent;
 
 UCLASS()
 class CWS_API ACWSPlayerController : public APlayerController
@@ -49,4 +52,22 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> GameOverWidget;
+
+	// Health UI
+	UFUNCTION()
+	void HandlePlayerHealthChanged(
+		float CurrentHealth,
+		float MaxHealth
+	);
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "UI",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TSubclassOf<UCWSPlayerHUDWidget> PlayerHUDWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCWSPlayerHUDWidget> PlayerHUDWidget;
 };

@@ -5,6 +5,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "Combat/CWSHealthComponent.h"
+#include "UI/CWSPlayerHUDWidget.h"
 
 ACWSPlayerController::ACWSPlayerController()
 {
@@ -22,6 +24,52 @@ void ACWSPlayerController::BeginPlay()
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::LockOnCapture);
 
 	SetInputMode(InputMode);
+
+	// Health bar
+	if (!IsLocalController() || !PlayerHUDWidgetClass)
+	{
+		return;
+	}
+
+	PlayerHUDWidget = CreateWidget<UCWSPlayerHUDWidget>(
+		this,
+		PlayerHUDWidgetClass
+	);
+	if (!IsValid(PlayerHUDWidget))
+	{
+		return;
+	}
+	PlayerHUDWidget->AddToViewport();
+
+	APawn* PlayerPawn = GetPawn();
+	if (!IsValid(PlayerPawn))
+	{
+		return;
+	}
+	UCWSHealthComponent* HealthComponent = PlayerPawn->FindComponentByClass<UCWSHealthComponent>();
+	if (!IsValid(HealthComponent))
+	{
+		return;
+	}
+	HealthComponent->OnHealthChanged.AddUniqueDynamic(
+		this,
+		&ACWSPlayerController::HandlePlayerHealthChanged
+	);
+
+	HandlePlayerHealthChanged(
+		HealthComponent->GetCurrentHealth(),
+		HealthComponent->GetMaxHealth()
+	);
+	
+}
+
+void ACWSPlayerController::HandlePlayerHealthChanged(float CurrentHealth, float MaxHealth)
+{
+	if (!IsValid(PlayerHUDWidget))
+	{
+		return;
+	}
+	PlayerHUDWidget->SetHealth(CurrentHealth, MaxHealth);
 }
 
 void ACWSPlayerController::ShowGameOverScreen()
