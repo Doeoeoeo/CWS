@@ -9,6 +9,11 @@
 class ACWSEnemyBase;
 class APawn;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(
+	FCWSSpawnBatchCompletedSignature
+);
+
+
 UCLASS()
 class CWS_API ACWSEnemySpawner : public AActor
 {
@@ -17,9 +22,17 @@ class CWS_API ACWSEnemySpawner : public AActor
 public:	
 	ACWSEnemySpawner();
 
-	void StartSpawning();
+	void StartSpawnBatch(int32 EnemyCount);
 	void StopSpawning();
 	void SetActiveEnemiesEnabled(bool bEnabled);
+
+
+	UPROPERTY(
+		BlueprintAssignable,
+		Category = "Spawning"
+	)
+	FCWSSpawnBatchCompletedSignature OnSpawnBatchCompleted;
+
 	
 protected:
 	virtual void BeginPlay() override;
@@ -66,8 +79,19 @@ private:
 			ClampMin = "1"
 		)
 	)
-	int32 MaxActiveEnemies = 5;
+	int32 MaxActiveEnemies = 2;
 
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Spawning",
+		meta = (
+			AllowPrivateAccess = true,
+			ClampMin = "1"
+		)
+	)
+	int32 InitialWaveEnemyCount = 5;
+	
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
@@ -76,9 +100,25 @@ private:
 	)
 	bool bSpawnImmediately = true;
 
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Spawning",
+		meta = (AllowPrivateAccess = true)
+	)
+	bool bStartAutomatically = false;
+	
 	FTimerHandle SpawnTimerHandle;
 	TWeakObjectPtr<APawn> TargetPawn;
 	TArray<TWeakObjectPtr<ACWSEnemyBase>> ActiveEnemies;
+
+	UFUNCTION()
+	void HandleSpawnedEnemyDestroyed(AActor* DestroyedActor);
+
+	void CheckSpawnBatchCompleted();
+	
+	int32 RemainingEnemiesToSpawn = 0;
+	bool bWaveActive = false;
 
 	
 };

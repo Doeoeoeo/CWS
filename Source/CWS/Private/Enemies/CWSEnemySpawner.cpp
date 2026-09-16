@@ -13,8 +13,17 @@ ACWSEnemySpawner::ACWSEnemySpawner()
 
 }
 
-void ACWSEnemySpawner::StartSpawning()
+void ACWSEnemySpawner::StartSpawnBatch(int32 EnemyCount)
 {
+	if (bWaveActive || EnemyCount <= 0)
+	{
+		return;
+	}
+
+	// Start the wave spawn
+	RemainingEnemiesToSpawn = EnemyCount;
+	bWaveActive = true;
+		
 	TargetPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 
 	if (bSpawnImmediately)
@@ -22,18 +31,25 @@ void ACWSEnemySpawner::StartSpawning()
 		SpawnEnemy();
 	}
 
-	GetWorldTimerManager().SetTimer(
-		SpawnTimerHandle,
-		this,
-		&ACWSEnemySpawner::SpawnEnemy,
-		SpawnInterval,
-		true
-	);
+	if (RemainingEnemiesToSpawn > 0)
+	{
+		GetWorldTimerManager().SetTimer(
+			SpawnTimerHandle,
+			this,
+			&ACWSEnemySpawner::SpawnEnemy,
+			SpawnInterval,
+			true
+		);
+	}
+
 }
 
 void ACWSEnemySpawner::StopSpawning()
 {
 	GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+
+	RemainingEnemiesToSpawn = 0;
+	bWaveActive = false;
 }
 
 void ACWSEnemySpawner::SetActiveEnemiesEnabled(bool bEnabled)
@@ -52,8 +68,10 @@ void ACWSEnemySpawner::BeginPlay()
 {
 	Super::BeginPlay();
 
-	StartSpawning();
-	
+	if (bStartAutomatically)
+	{
+		StartSpawnBatch(InitialWaveEnemyCount);
+	}
 }
 
 void ACWSEnemySpawner::SpawnEnemy()
@@ -74,6 +92,12 @@ void ACWSEnemySpawner::SpawnEnemy()
 		}
 	}
 
+	if (!bWaveActive || RemainingEnemiesToSpawn <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+		CheckSpawnBatchCompleted();
+		return;
+	}
 	// Remove dead enemies
 	ActiveEnemies.RemoveAll(
 		[](const TWeakObjectPtr<ACWSEnemyBase>& Enemy)
@@ -108,13 +132,54 @@ void ACWSEnemySpawner::SpawnEnemy()
 			FRotator::ZeroRotator,
 			SpawnParameters
 	);
-	if (IsValid(SpawnedEnemy))
+	
+	if (!IsValid(SpawnedEnemy))
 	{
-		ActiveEnemies.Add(SpawnedEnemy);
+		return;
+	}
+	
+	ActiveEnemies.Add(SpawnedEnemy);
+	SpawnedEnemy->OnDestroyed.AddUniqueDynamic(
+		this,
+		&ACWSEnemySpawner::HandleSpawnedEnemyDestroyed
+	);
+
+	--RemainingEnemiesToSpawn;
+
+	if (RemainingEnemiesToSpawn <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(SpawnTimerHandle);
+	}
+}
+
+void ACWSEnemySpawner::HandleSpawnedEnemyDestroyed(AActor* DestroyedActor)
+{
+	ActiveEnemies.RemoveAll(
+		[DestroyedActor](
+			const TWeakObjectPtr<ACWSEnemyBase>& Enemy
+		)
+		{
+			return !Enemy.IsValid() || Enemy.Get() == DestroyedActor;
+		}
+	);
+	CheckSpawnBatchCompleted();
+}
+
+void ACWSEnemySpawner::CheckSpawnBatchCompleted()
+{
+	// Do nothing (the wave is not over)
+	// if 1 - wave isn't active, 2 - enemies are left to spawn, 3 - enemies are still alive.
+	if (
+		!bWaveActive ||
+		RemainingEnemiesToSpawn > 0 ||
+		!ActiveEnemies.IsEmpty())
+	{
+		return;
 	}
 
-	
-
+	bWaveActive = false;
+	UE_LOG(LogTemp, Log, TEXT("Spawner wave cleared"));
+	OnSpawnBatchCompleted.Broadcast();
 	
 }
 

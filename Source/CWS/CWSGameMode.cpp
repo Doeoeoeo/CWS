@@ -3,10 +3,10 @@
 #include "CWSGameMode.h"
 
 #include "Combat/CWSHealthComponent.h"
-#include "Enemies/CWSEnemySpawner.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/CWSPlayerCharacter.h"
 #include "Player/CWSPlayerController.h"
+#include "Waves/CWSWaveManager.h"
 
 ACWSGameMode::ACWSGameMode()
 {
@@ -18,21 +18,26 @@ void ACWSGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	TArray<AActor*> FoundSpawners;
-	UGameplayStatics::GetAllActorsOfClass(
-		this,
-		ACWSEnemySpawner::StaticClass(),
-		FoundSpawners
-	);
-
-	for (AActor* Actor : FoundSpawners)
+	if (!WaveManagerClass)
 	{
-		if (ACWSEnemySpawner* Spawner = Cast<ACWSEnemySpawner>(Actor))
-		{
-			EnemySpawners.Add(Spawner);
-		}
+		UE_LOG(LogTemp, Warning, TEXT("WaveManagerClass is not set!"));
+		return;
 	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+
+	WaveManager = GetWorld()->SpawnActor<ACWSWaveManager>(
+		WaveManagerClass,
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		SpawnParameters
+	);
 	
+	if (IsValid(WaveManager))
+	{
+		WaveManager->StartWaves();
+	}
 }
 
 void ACWSGameMode::RestartPlayer(AController* NewPlayer)
@@ -40,7 +45,17 @@ void ACWSGameMode::RestartPlayer(AController* NewPlayer)
 	Super::RestartPlayer(NewPlayer);
 
 	const APawn* PlayerPawn = NewPlayer->GetPawn();
+	if (!IsValid(PlayerPawn))
+	{
+		return;
+	}
+	
 	UCWSHealthComponent* HealthComponent = PlayerPawn->FindComponentByClass<UCWSHealthComponent>();
+	if (!IsValid(HealthComponent))
+	{
+		return;
+	}
+	
 	HealthComponent->OnDeath.AddUniqueDynamic(
 		this,
 		&ACWSGameMode::HandlePlayerDeath
@@ -58,17 +73,11 @@ void ACWSGameMode::HandlePlayerDeath(AActor* DeadActor)
 
 	bRoundOver = true;
 
-	// Stop enemy spawning and movement
-	for (const TWeakObjectPtr<ACWSEnemySpawner>& Spawner: EnemySpawners)
+	if (IsValid(WaveManager))
 	{
-		if (Spawner.IsValid())
-		{
-			Spawner->StopSpawning();
-			Spawner->SetActiveEnemiesEnabled(false);
-		}
-
-		UE_LOG(LogTemp, Log, TEXT("Game Over"));
+		WaveManager->StopWaves();
 	}
+	UE_LOG(LogTemp, Log, TEXT("Game Over"));
 
 	// Display Game Over screen
 	if (ACWSPlayerController* PlayerController = Cast<ACWSPlayerController>(

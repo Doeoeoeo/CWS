@@ -8,7 +8,7 @@
 
 
 
-class ACWSEnemySpawner;
+class ACWSWaveManager;
 
 UCLASS()
 class CWS_API ACWSGameMode : public AGameModeBase
@@ -26,11 +26,19 @@ protected:
 private:
 	UFUNCTION()
 	void HandlePlayerDeath(AActor* DeadActor);
-
-	TArray<TWeakObjectPtr<ACWSEnemySpawner>> EnemySpawners;
-
-	bool bRoundOver = false;
 	
+	bool bRoundOver = false;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Waves",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TSubclassOf<ACWSWaveManager> WaveManagerClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACWSWaveManager> WaveManager;
 };
 
 
