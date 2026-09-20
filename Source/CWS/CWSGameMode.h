@@ -6,7 +6,13 @@
 #include "GameFramework/GameModeBase.h"
 #include "CWSGameMode.generated.h"
 
-
+UENUM(BlueprintType)
+enum class ECWSGamePhase : uint8
+{
+	Combat,
+	UpgradeSelection,
+	GameOver
+};
 
 class ACWSWaveManager;
 
@@ -27,8 +33,15 @@ private:
 	UFUNCTION()
 	void HandlePlayerDeath(AActor* DeadActor);
 	
-	bool bRoundOver = false;
-
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		Category = "Game",
+		meta = (AllowPrivateAccess = "true")
+	)
+	ECWSGamePhase CurrentPhase = ECWSGamePhase::Combat;
+	
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
@@ -39,6 +52,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACWSWaveManager> WaveManager;
+
+	UFUNCTION()
+	void HandleAllWavesCompleted();
 };
 
 

@@ -36,6 +36,11 @@ void ACWSGameMode::BeginPlay()
 	
 	if (IsValid(WaveManager))
 	{
+		WaveManager->OnAllWavesCompleted.AddDynamic(
+			this,
+			&ACWSGameMode::HandleAllWavesCompleted
+		);
+		
 		WaveManager->StartWaves();
 	}
 }
@@ -66,12 +71,12 @@ void ACWSGameMode::RestartPlayer(AController* NewPlayer)
 
 void ACWSGameMode::HandlePlayerDeath(AActor* DeadActor)
 {
-	if (bRoundOver)
+	if (CurrentPhase != ECWSGamePhase::Combat)
 	{
 		return;
 	}
 
-	bRoundOver = true;
+	CurrentPhase = ECWSGamePhase::GameOver;
 
 	if (IsValid(WaveManager))
 	{
@@ -87,4 +92,16 @@ void ACWSGameMode::HandlePlayerDeath(AActor* DeadActor)
 		PlayerController->ShowGameOverScreen();
 	}
 	
+}
+
+void ACWSGameMode::HandleAllWavesCompleted()
+{
+	if (CurrentPhase != ECWSGamePhase::Combat)
+	{
+		return;
+	}
+
+	CurrentPhase = ECWSGamePhase::UpgradeSelection;
+	
+	UE_LOG(LogTemp, Log, TEXT("Entering upgrade selection"));
 }

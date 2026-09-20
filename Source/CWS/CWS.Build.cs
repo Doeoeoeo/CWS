@@ -17,7 +17,8 @@ public class CWS : ModuleRules
 			"EnhancedInput",
 			"Paper2D",
 			"AIModule",
-			"UMG"
+			"UMG",
+			"Engine",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AIModule" });

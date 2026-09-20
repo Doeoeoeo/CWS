@@ -14,6 +14,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	WaveNumber
 );
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(
+	FCWSAllWavesCompletedSignature
+);
 
 USTRUCT(BlueprintType)
 struct FCWSSpawnBatchDefinition
@@ -71,6 +74,12 @@ public:
 		Category = "Waves"
 	)
 	FCWSWaveStateSignature OnWaveCompleted;
+
+	UPROPERTY(
+		BlueprintAssignable,
+		Category = "Waves"
+	)
+	FCWSAllWavesCompletedSignature OnAllWavesCompleted;
 	
 protected:
 	virtual void BeginPlay() override;

@@ -73,7 +73,7 @@ void ACWSWaveManager::CreateSpawners()
 
 			if (!IsValid(Spawner))
 			{
-				return;
+				continue;
 			}
 
 			Spawner->OnSpawnBatchCompleted.AddUniqueDynamic(
@@ -97,6 +97,7 @@ void ACWSWaveManager::StartNextWave()
 	{
 		bWavesRunning = false;
 		UE_LOG(LogTemp, Log, TEXT("All waves have completed"));
+		return;
 	}
 	
 
@@ -169,6 +170,8 @@ void ACWSWaveManager::HandleSpawnBatchCompleted()
 	{
 		bWavesRunning = false;
 		UE_LOG(LogTemp, Log, TEXT("All waves have completed"));
+
+		OnAllWavesCompleted.Broadcast();
 		return;
 	}
 	
