@@ -53,13 +53,7 @@ bool UCWSFlowGridComponent::PlaceElement(
 	{
 		return false;
 	}
-	if (Instance->bIsPlaced)
-	{
-		if (!UnplaceElement(InstanceId))
-		{
-			return false;
-		}
-	}
+
 	
 	TArray<FIntPoint> Cells;
 	GetElementCells(
@@ -72,8 +66,13 @@ bool UCWSFlowGridComponent::PlaceElement(
 	{
 		return false;
 	}
-
-	UnplaceElement(InstanceId);
+	if (Instance->bIsPlaced)
+	{
+		if (!UnplaceElement(InstanceId))
+		{
+			return false;
+		}
+	}
 	
 	Instance->GridOrigin = GridOrigin;
 	Instance->RotationSteps = RotationSteps % 4;
@@ -85,7 +84,7 @@ bool UCWSFlowGridComponent::PlaceElement(
 	{
 		OccupiedCells.Add(Cell, InstanceId);
 	}
-
+	
 	return true;
 }
 
@@ -138,7 +137,7 @@ bool UCWSFlowGridComponent::DeleteElementInstance(FGuid InstanceId)
 	{
 		return false;
 	}
-	if (!Instance->bIsPlaced)
+	if (Instance->bIsPlaced)
 	{
 		if (!UnplaceElement(InstanceId))
 		{
@@ -147,6 +146,117 @@ bool UCWSFlowGridComponent::DeleteElementInstance(FGuid InstanceId)
 	}
 	
 	return FlowElementInstances.Remove(InstanceId) > 0;
+}
+
+bool UCWSFlowGridComponent::CreateFlowGraph()
+{
+
+	CWSFlowGraph NewGraph;
+	TMap<FCWSPipeSocketKey, FCWSResolvedPipe> ResolvedPipes;
+	
+	for (const TPair<FGuid, FCWSFlowElementInstance>& Batch : FlowElementInstances)
+	{
+		const FCWSFlowElementInstance* Instance = &Batch.Value;
+		if (!Instance->bIsPlaced || !IsValid(Instance->Definition.Get()))
+		{
+			continue;
+		}
+		NewGraph.AddNode(Batch.Key);
+		UE_LOG(LogTemp, Warning, TEXT("Made a node"));
+		const TArray<FCWSPipeDefinition>& PipeDefinitions = Instance->Definition->Pipes;
+		
+		for (int32 PipeIndex = 0; PipeIndex < Instance->Definition->Pipes.Num(); PipeIndex++)
+		{
+			const FCWSPipeDefinition& Pipe = PipeDefinitions[PipeIndex];
+			const FIntPoint PipeCell =
+				Instance->GridOrigin +
+				RotateLocalCoordinate(
+					Pipe.LocalCoordinate,
+					Instance->RotationSteps
+			);
+			
+			const ECWSPipeDirection PipeDirection = RotatePipeDirection(
+				Pipe.Direction,
+				Instance->RotationSteps
+			);
+			FCWSPipeSocketKey SocketKey = FCWSPipeSocketKey{
+				PipeCell,
+				PipeDirection
+			};
+			
+			if (ResolvedPipes.Contains(SocketKey))
+			{
+				return false;
+			}
+			FCWSResolvedPipe ResolvedPipe;
+			ResolvedPipe.InstanceId = Instance->InstanceId;
+			ResolvedPipe.GridCell = PipeCell;
+			ResolvedPipe.Direction = PipeDirection;
+			ResolvedPipe.Type = Pipe.Type;
+			ResolvedPipe.PipeIndex = PipeIndex;
+			ResolvedPipe.OutputWeight = Pipe.OutputWeight;
+
+			ResolvedPipes.Add(
+				SocketKey,
+				ResolvedPipe
+			);
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Starting on Pipes"));
+	
+	for (const TPair<FCWSPipeSocketKey, FCWSResolvedPipe>& Batch : ResolvedPipes)
+	{
+		const FCWSResolvedPipe* Pipe = &Batch.Value;
+		if (Pipe->Direction == ECWSPipeDirection::Up || Pipe->Direction == ECWSPipeDirection::Left)
+		{
+			continue;
+		}
+
+		const FIntPoint NeighbourCell = Pipe->GridCell + GetDirectionOffset(Pipe->Direction);
+
+		const FCWSPipeSocketKey NeighbourSocketKey = FCWSPipeSocketKey{
+			NeighbourCell,
+			GetOppositeDirection(Pipe->Direction)
+		};
+		FCWSResolvedPipe* NeighbourPipe = ResolvedPipes.Find(NeighbourSocketKey);
+		if (!NeighbourPipe || NeighbourPipe->InstanceId == Pipe->InstanceId)
+		{
+			continue;
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Trying to add Pipe "));		
+		NewGraph.AddEdge(
+			Pipe->InstanceId,
+			NeighbourPipe->InstanceId,
+			Pipe->OutputWeight * NeighbourPipe->OutputWeight,
+			Pipe->Type,
+			NeighbourPipe->Type,
+			Pipe->Direction,
+			NeighbourPipe->Direction
+		);
+	}
+
+	FlowGraph = MoveTemp(NewGraph);
+	
+	return true;
+}
+
+void UCWSFlowGridComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	InitializeRoots();
+}
+
+void UCWSFlowGridComponent::PrintGraphDebug() const
+{
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("Flow graph: Nodes=%d Edges=%d"),
+		FlowGraph.GetNodeCount(),
+		FlowGraph.GetEdgeCount()
+	);
 }
 
 FIntPoint UCWSFlowGridComponent::RotateLocalCoordinate(
@@ -196,6 +306,70 @@ bool UCWSFlowGridComponent::CanPlaceOnCells (
 
 	return true;
 }
+
+ECWSPipeDirection UCWSFlowGridComponent::RotatePipeDirection(
+	ECWSPipeDirection Direction,
+	int32 RotationSteps
+) const {
+	const uint8 DirectionValue = static_cast<uint8>(Direction);
+	return static_cast<ECWSPipeDirection>((DirectionValue + RotationSteps) % 4); 
+}
+
+ECWSPipeDirection UCWSFlowGridComponent::GetOppositeDirection(ECWSPipeDirection Direction) const
+{
+	return RotatePipeDirection(Direction, 2);
+}
+
+FIntPoint UCWSFlowGridComponent::GetDirectionOffset(ECWSPipeDirection Direction) const
+{
+	switch (static_cast<uint8>(Direction))
+	{
+		case 0:
+			return FIntPoint(0, -1);
+		case 1:
+			return FIntPoint(1, 0);
+		case 2:
+			return FIntPoint(0, 1);
+		case 3:
+			return FIntPoint(-1, 0);
+		default:
+			return FIntPoint(0, 0);
+	}
+}
+
+bool UCWSFlowGridComponent::AddRoot(
+	UCWSFlowElementDefinition* Definition,
+	FIntPoint GridCell,
+	uint8 RotationSteps,
+	FGuid& RootId
+) {
+	RootId = FGuid();
+
+	if (!CreateElementInstance(Definition, RootId))
+	{
+		return false;
+	}
+
+	if (!PlaceElement(RootId, GridCell, RotationSteps))
+	{
+		return false;
+	}
+
+	RootInstanceIds.Add(RootId);
+	return true;
+}
+
+void UCWSFlowGridComponent::InitializeRoots()
+{
+	FGuid RootId;
+	AddRoot(
+		RootDefinition,
+		RootGridCell,
+		0,
+		RootId
+	);
+}
+
 
 
 
