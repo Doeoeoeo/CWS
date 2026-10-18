@@ -91,6 +91,9 @@ public:
 
 	virtual void BeginPlay() override;
 
+	UFUNCTION(BlueprintCallable, Category = "Flow Grid")
+	bool RecalculateFlow();
+	
 	//Debugg
 	UFUNCTION(BlueprintCallable, Category = "Flow Grid|Debug")
 	void PrintGraphDebug() const;

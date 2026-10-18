@@ -156,13 +156,13 @@ bool UCWSFlowGridComponent::CreateFlowGraph()
 	
 	for (const TPair<FGuid, FCWSFlowElementInstance>& Batch : FlowElementInstances)
 	{
+		
 		const FCWSFlowElementInstance* Instance = &Batch.Value;
 		if (!Instance->bIsPlaced || !IsValid(Instance->Definition.Get()))
 		{
 			continue;
 		}
-		NewGraph.AddNode(Batch.Key);
-		UE_LOG(LogTemp, Warning, TEXT("Made a node"));
+		NewGraph.AddNode(Batch.Key, RootInstanceIds.Contains(Batch.Key));
 		const TArray<FCWSPipeDefinition>& PipeDefinitions = Instance->Definition->Pipes;
 		
 		for (int32 PipeIndex = 0; PipeIndex < Instance->Definition->Pipes.Num(); PipeIndex++)
@@ -203,16 +203,16 @@ bool UCWSFlowGridComponent::CreateFlowGraph()
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Starting on Pipes"));
 	
 	for (const TPair<FCWSPipeSocketKey, FCWSResolvedPipe>& Batch : ResolvedPipes)
 	{
 		const FCWSResolvedPipe* Pipe = &Batch.Value;
+		// Ignore up and left facing pipes
 		if (Pipe->Direction == ECWSPipeDirection::Up || Pipe->Direction == ECWSPipeDirection::Left)
 		{
 			continue;
 		}
-
+		
 		const FIntPoint NeighbourCell = Pipe->GridCell + GetDirectionOffset(Pipe->Direction);
 
 		const FCWSPipeSocketKey NeighbourSocketKey = FCWSPipeSocketKey{
@@ -220,11 +220,12 @@ bool UCWSFlowGridComponent::CreateFlowGraph()
 			GetOppositeDirection(Pipe->Direction)
 		};
 		FCWSResolvedPipe* NeighbourPipe = ResolvedPipes.Find(NeighbourSocketKey);
+		
 		if (!NeighbourPipe || NeighbourPipe->InstanceId == Pipe->InstanceId)
 		{
 			continue;
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Trying to add Pipe "));		
+
 		NewGraph.AddEdge(
 			Pipe->InstanceId,
 			NeighbourPipe->InstanceId,
@@ -237,6 +238,7 @@ bool UCWSFlowGridComponent::CreateFlowGraph()
 	}
 
 	FlowGraph = MoveTemp(NewGraph);
+	FlowGraph.FinalizeBuild();
 	
 	return true;
 }
@@ -246,6 +248,31 @@ void UCWSFlowGridComponent::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeRoots();
+}
+
+bool UCWSFlowGridComponent::RecalculateFlow()
+{
+	if (!CreateFlowGraph())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to Create Graph"));
+		return false;
+	}
+
+	if (!FlowGraph.ConstructFlowGraph())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to Construct Graph"));
+		return false;
+	}
+
+	if (!FlowGraph.ComputeFlow())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Failed to Compute Flow"));
+		return false;
+	}
+
+	FlowGraph.LogComputedFlows();
+
+	return true;
 }
 
 void UCWSFlowGridComponent::PrintGraphDebug() const
@@ -368,6 +395,8 @@ void UCWSFlowGridComponent::InitializeRoots()
 		0,
 		RootId
 	);
+	UE_LOG(LogTemp, Warning, TEXT("Flow Check %s"), *RootId.ToString());
+
 }
 
 
