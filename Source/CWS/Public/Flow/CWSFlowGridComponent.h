@@ -6,6 +6,7 @@
 #include "CWSFlowElementInstance.h"
 #include "Components/ActorComponent.h"
 #include "CWSFlowGraph.h"
+#include "Flow/CWSResolvedPipe.h"
 #include "CWSFlowGridComponent.generated.h"
 
 
@@ -28,20 +29,15 @@ struct FCWSPipeSocketKey
 	}
 };
 
-struct FCWSResolvedPipe
-{
-	FGuid InstanceId;
-	int32 PipeIndex = INDEX_NONE;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(
+	FCWSFlowStructureChangedSignature
+);
 
-	FIntPoint GridCell = FIntPoint::ZeroValue;
-
-	ECWSPipeDirection Direction = ECWSPipeDirection::Down;
-	ECWSPipeType Type = ECWSPipeType::Closed;
-
-	float OutputWeight = 1.0f;
-};
-
-
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FCWSFlowElementInstanceEventSignature,
+	FGuid,
+	InstanceId
+);
 
 
 UCLASS(ClassGroup = (CWS), meta = (BlueprintSpawnableComponent))
@@ -52,6 +48,50 @@ class CWS_API UCWSFlowGridComponent : public UActorComponent
 public:	
 	UCWSFlowGridComponent();
 
+	// Notifications
+	UPROPERTY(BlueprintAssignable, Category = "Flow Grid")
+	FCWSFlowStructureChangedSignature OnStructureChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Flow Grid")
+	FCWSFlowElementInstanceEventSignature OnElementCreated;
+
+	UPROPERTY(BlueprintAssignable, Category = "Flow Grid")
+	FCWSFlowElementInstanceEventSignature OnElementPlaced;
+
+	UPROPERTY(BlueprintAssignable, Category = "Flow Grid")
+	FCWSFlowElementInstanceEventSignature OnElementUnplaced;
+
+	UPROPERTY(BlueprintAssignable, Category = "Flow Grid")
+	FCWSFlowElementInstanceEventSignature OnElementDeleted;
+
+	// UI access functions
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	bool TryGetInstanceAtCell(FIntPoint Cell, FGuid& OutInstanceId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	bool TryGetElementInstance(FIntPoint Cell, FCWSFlowElementInstance& OutInstance) const;
+
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	bool TryGetInstanceById(FGuid InstanceId, FCWSFlowElementInstance& OutInstance) const;
+	
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	FIntPoint GetGridSize() const;
+
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	void GetUnplacedElementIds(TArray<FGuid>& OutInstanceIds) const;
+
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	void GetPlacedElementIds(TArray<FGuid>& OutInstanceIds) const;
+
+	UFUNCTION(BlueprintPure, Category = "Flow Grid")
+	bool GetPlacementCells(
+		FGuid InstanceId,
+		FIntPoint GridOrigin,
+		uint8 RotationSteps,
+		TArray<FIntPoint>& OutCells
+	) const;
+	
+	// Graph construction functions
 	UFUNCTION(BlueprintPure, Category = "Flow Grid")
 	bool IsCellInsideGrid(FIntPoint Cell) const;
 
@@ -93,8 +133,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Flow Grid")
 	bool RecalculateFlow();
+
+	// Flow to UI
+	bool ResolvePipesForInstance(
+		const FCWSFlowElementInstance& Instance,
+		TArray<FCWSResolvedPipe>& OutResolvedPipes
+	) const;
 	
-	//Debugg
+	
+	// Debug
 	UFUNCTION(BlueprintCallable, Category = "Flow Grid|Debug")
 	void PrintGraphDebug() const;
 
@@ -130,6 +177,8 @@ private:
 	ECWSPipeDirection GetOppositeDirection(ECWSPipeDirection Direction) const;
 
 	FIntPoint GetDirectionOffset(ECWSPipeDirection Direction) const;
+
+	void ClearPlacement(FCWSFlowElementInstance& Instance);
 	
 	UPROPERTY(
 		EditAnywhere,
@@ -171,4 +220,5 @@ private:
 	);
 	
 	void InitializeRoots();
+
 };
